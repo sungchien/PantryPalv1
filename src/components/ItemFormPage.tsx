@@ -22,25 +22,10 @@ export default function ItemFormPage({ page, items, locations, categories, navig
   const [expiryDate, setExpiryDate] = useState(editingItem?.expiry_date || new Date().toISOString().split('T')[0]);
   const [quantityUnopened, setQuantityUnopened] = useState(editingItem?.quantity_unopened || 0);
   const [quantityOpened, setQuantityOpened] = useState(editingItem?.quantity_opened || 0);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showNameAlert, setShowNameAlert] = useState(false);
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      alert('請輸入食品名稱');
-      return;
-    }
-
-    const totalQuantity = quantityUnopened + quantityOpened;
-    
-    if (totalQuantity === 0) {
-      if (confirm('未開封和已開封的數量總和為0，將刪除這筆食品資料。確定要繼續嗎？')) {
-        if (isEdit) {
-          await onDelete(page.itemId);
-        }
-        navigate({ name: 'main' });
-      }
-      return;
-    }
-
+  const executeSave = async () => {
     const newItem: FoodItem = {
       id: isEdit ? page.itemId : Math.random().toString(36).substr(2, 9),
       name,
@@ -55,8 +40,75 @@ export default function ItemFormPage({ page, items, locations, categories, navig
     navigate({ name: 'main' });
   };
 
+  const handleSave = async () => {
+    if (!name.trim()) {
+      setShowNameAlert(true);
+      return;
+    }
+
+    const totalQuantity = quantityUnopened + quantityOpened;
+    
+    if (totalQuantity === 0) {
+      setShowDeleteConfirm(true);
+      return;
+    }
+
+    await executeSave();
+  };
+
+  const confirmDeleteAndExit = async () => {
+    if (isEdit) {
+      await onDelete(page.itemId);
+    }
+    navigate({ name: 'main' });
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-[#FDF5E6]">
+      {/* Custom Alert Modal for Name */}
+      {showNameAlert && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h3 className="text-xl font-bold text-[#4a4a4a] mb-2 text-center">提示</h3>
+            <p className="text-[#8a8060] text-center mb-6 leading-relaxed">
+              請輸入食品名稱。
+            </p>
+            <button 
+              onClick={() => setShowNameAlert(false)}
+              className="w-full py-4 bg-[#A8D5BA] text-[#2c5c40] font-bold rounded-2xl shadow-sm active:scale-95 transition-transform"
+            >
+              我知道了
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Custom Confirmation Modal */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h3 className="text-xl font-bold text-[#4a4a4a] mb-2 text-center">確認刪除？</h3>
+            <p className="text-[#8a8060] text-center mb-6 leading-relaxed">
+              未開封和已開封的數量總和為 0，這將會刪除此筆食品資料。
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={confirmDeleteAndExit}
+                className="w-full py-4 bg-[#e57373] text-white font-bold rounded-2xl shadow-sm active:scale-95 transition-transform"
+              >
+                確定刪除
+              </button>
+              <button 
+                onClick={() => setShowDeleteConfirm(false)}
+                className="w-full py-4 bg-gray-100 text-[#8a8060] font-bold rounded-2xl active:scale-95 transition-transform"
+              >
+                返回修改
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="sticky top-0 z-50 bg-[#FDF5E6]/90 backdrop-blur-sm px-4 py-4 flex items-center justify-between border-b border-[#E8E2D2]">
         <button 
           onClick={() => navigate({ name: 'main' })}
@@ -135,7 +187,16 @@ export default function ItemFormPage({ page, items, locations, categories, navig
                 >
                   -
                 </button>
-                <span className="w-6 text-center text-lg font-bold text-[#4a4a4a]">{quantityUnopened}</span>
+                <input 
+                  type="number"
+                  min="0"
+                  value={quantityUnopened}
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    setQuantityUnopened(isNaN(val) ? 0 : Math.max(0, val));
+                  }}
+                  className="w-12 text-center text-lg font-bold text-[#4a4a4a] bg-transparent border-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
                 <button 
                   onClick={() => setQuantityUnopened(quantityUnopened + 1)}
                   className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-[#4a4a4a] shadow-sm"
@@ -161,7 +222,16 @@ export default function ItemFormPage({ page, items, locations, categories, navig
                 >
                   -
                 </button>
-                <span className="w-6 text-center text-lg font-bold text-[#4a4a4a]">{quantityOpened}</span>
+                <input 
+                  type="number"
+                  min="0"
+                  value={quantityOpened}
+                  onChange={e => {
+                    const val = parseInt(e.target.value);
+                    setQuantityOpened(isNaN(val) ? 0 : Math.max(0, val));
+                  }}
+                  className="w-12 text-center text-lg font-bold text-[#4a4a4a] bg-transparent border-none focus:ring-0 p-0 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
                 <button 
                   onClick={() => setQuantityOpened(quantityOpened + 1)}
                   className="w-8 h-8 flex items-center justify-center rounded-full bg-white text-[#4a4a4a] shadow-sm"

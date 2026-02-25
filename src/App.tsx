@@ -3,20 +3,23 @@ import { FoodItem, PageState } from './types';
 import MainPage from './components/MainPage';
 import ItemFormPage from './components/ItemFormPage';
 import SettingsPage from './components/SettingsPage';
-import { db } from './firebase';
+import { db, auth, googleProvider } from './firebase';
 import { 
   collection, 
   onSnapshot, 
   doc, 
   setDoc, 
-  deleteDoc, 
-  getDoc 
+  deleteDoc,
+  query
 } from 'firebase/firestore';
+import { onAuthStateChanged, signInWithPopup, signOut, User } from 'firebase/auth';
+import { LogIn, LogOut } from 'lucide-react';
 
 const defaultLocations = ["冷凍庫", "冷藏室上方", "冷藏室下方", "其他"];
 const defaultCategories = ["乳製品", "肉類", "海鮮", "蔬菜", "水果", "五穀雜糧", "調味料", "零食飲料", "加工食品", "其他"];
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
   const [page, setPage] = useState<PageState>({ name: 'main' });
   const [locations, setLocations] = useState<string[]>(defaultLocations);
   const [categories, setCategories] = useState<string[]>(defaultCategories);
@@ -24,24 +27,27 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [isLocalMode, setIsLocalMode] = useState(false);
 
-  // Helper to load from local storage
-  const loadLocalData = () => {
-    const localItems = localStorage.getItem('pantry_items');
-    const localSettings = localStorage.getItem('pantry_settings');
-    if (localItems) setItems(JSON.parse(localItems));
-    if (localSettings) {
-      const settings = JSON.parse(localSettings);
-      setLocations(settings.locations);
-      setCategories(settings.categories);
-    }
-    setIsLocalMode(true);
-    setLoading(false);
-  };
-
-  // Sync Items from Firestore
+  // Auth Listener
   useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      if (!currentUser) {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync Items from Firestore (User-specific path)
+  useEffect(() => {
+    if (!user) {
+      setItems([]);
+      return;
+    }
+
+    const pantryRef = collection(db, "users", user.uid, "pantryItems");
     const unsubscribe = onSnapshot(
-      collection(db, "foods"), 
+      pantryRef, 
       (snapshot) => {
         const foodsData = snapshot.docs.map(doc => ({
           id: doc.id,
@@ -62,11 +68,13 @@ export default function App() {
       }
     );
     return () => unsubscribe();
-  }, []);
+  }, [user]);
 
-  // Sync Settings from Firestore
+  // Sync Settings from Firestore (User-specific path)
   useEffect(() => {
-    const settingsDoc = doc(db, "config", "settings");
+    if (!user) return;
+
+    const settingsDoc = doc(db, "users", user.uid, "config", "settings");
     const unsubscribe = onSnapshot(
       settingsDoc, 
       (snapshot) => {
@@ -78,16 +86,50 @@ export default function App() {
           setDoc(settingsDoc, {
             locations: defaultLocations,
             categories: defaultCategories
-          });
+          }).catch(err => console.warn("Failed to init settings:", err));
         }
       },
       (error) => {
         console.error("Firestore settings sync error:", error);
-        // Fallback already handled by items listener
+        if (error.code === 'permission-denied') {
+          console.warn("Settings permission denied. Using default/local settings.");
+          // If we have local settings, use them as fallback
+          const localSettings = localStorage.getItem('pantry_settings');
+          if (localSettings) {
+            const settings = JSON.parse(localSettings);
+            setLocations(settings.locations);
+            setCategories(settings.categories);
+          }
+        }
       }
     );
     return () => unsubscribe();
-  }, []);
+  }, [user]);
+
+  const loadLocalData = () => {
+    const localItems = localStorage.getItem('pantry_items');
+    const localSettings = localStorage.getItem('pantry_settings');
+    if (localItems) setItems(JSON.parse(localItems));
+    if (localSettings) {
+      const settings = JSON.parse(localSettings);
+      setLocations(settings.locations);
+      setCategories(settings.categories);
+    }
+    setIsLocalMode(true);
+    setLoading(false);
+  };
+
+  const handleLogin = async () => {
+    try {
+      setLoading(true);
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error("Login error:", error);
+      setLoading(false);
+    }
+  };
+
+  const handleLogout = () => signOut(auth);
 
   const navigate = (newPage: PageState) => setPage(newPage);
 
@@ -96,8 +138,8 @@ export default function App() {
       localStorage.setItem('pantry_settings', JSON.stringify({ locations: newLocations, categories: newCategories }));
       setLocations(newLocations);
       setCategories(newCategories);
-    } else {
-      const settingsDoc = doc(db, "config", "settings");
+    } else if (user) {
+      const settingsDoc = doc(db, "users", user.uid, "config", "settings");
       await setDoc(settingsDoc, {
         locations: newLocations,
         categories: newCategories
@@ -112,8 +154,8 @@ export default function App() {
         : [...items, item];
       setItems(newItems);
       localStorage.setItem('pantry_items', JSON.stringify(newItems));
-    } else {
-      const foodDoc = doc(db, "foods", item.id);
+    } else if (user) {
+      const foodDoc = doc(db, "users", user.uid, "pantryItems", item.id);
       await setDoc(foodDoc, item);
     }
   };
@@ -123,8 +165,8 @@ export default function App() {
       const newItems = items.filter(i => i.id !== id);
       setItems(newItems);
       localStorage.setItem('pantry_items', JSON.stringify(newItems));
-    } else {
-      const foodDoc = doc(db, "foods", id);
+    } else if (user) {
+      const foodDoc = doc(db, "users", user.uid, "pantryItems", id);
       await deleteDoc(foodDoc);
     }
   };
@@ -137,11 +179,47 @@ export default function App() {
     );
   }
 
+  if (!user && !isLocalMode) {
+    return (
+      <div className="min-h-screen bg-[#FDF5E6] flex flex-col items-center justify-center p-6 text-center">
+        <div className="w-24 h-24 bg-[#A8D5BA] rounded-3xl flex items-center justify-center mb-6 shadow-lg">
+          <LogIn size={48} className="text-white" />
+        </div>
+        <h1 className="text-3xl font-bold text-[#4a4a4a] mb-2">歡迎來到 PantryPal</h1>
+        <p className="text-[#8a8060] mb-8">登入以開始管理您的家庭食品庫存</p>
+        <button 
+          onClick={handleLogin}
+          className="flex items-center gap-3 px-8 py-4 bg-white border border-gray-200 rounded-2xl shadow-sm hover:shadow-md transition-all font-bold text-[#4a4a4a]"
+        >
+          <img src="https://www.google.com/favicon.ico" className="w-5 h-5" alt="Google" />
+          使用 Google 帳號登入
+        </button>
+        <button 
+          onClick={loadLocalData}
+          className="mt-6 text-sm text-[#8a8060] underline"
+        >
+          暫不登入，使用本地模式測試
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#FDF5E6] text-[#4a4a4a] font-sans">
       {isLocalMode && (
         <div className="bg-orange-100 text-orange-800 px-4 py-2 text-xs text-center font-medium border-b border-orange-200">
-          ⚠️ Firebase 權限不足，目前正使用「本地儲存模式」。資料將僅保存在此瀏覽器中。
+          ⚠️ 目前正使用「本地儲存模式」。登入以同步資料至雲端。
+        </div>
+      )}
+      {user && page.name === 'main' && (
+        <div className="bg-[#A8D5BA]/10 px-4 py-2 flex items-center justify-between border-b border-[#A8D5BA]/20">
+          <div className="flex items-center gap-2">
+            <img src={user.photoURL || ''} className="w-6 h-6 rounded-full" alt="avatar" />
+            <span className="text-xs font-medium text-[#4a4a4a]">{user.displayName}</span>
+          </div>
+          <button onClick={handleLogout} className="text-xs text-[#c25e5e] flex items-center gap-1 font-bold">
+            <LogOut size={14} /> 登出
+          </button>
         </div>
       )}
       {page.name === 'main' && (

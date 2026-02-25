@@ -12,11 +12,18 @@ interface Props {
 export default function SettingsPage({ locations, categories, onSave, navigate }: Props) {
   const [tempLocations, setTempLocations] = useState([...locations]);
   const [tempCategories, setTempCategories] = useState([...categories]);
+  
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  
+  const [newLocationName, setNewLocationName] = useState('');
+  const [isAddingLocation, setIsAddingLocation] = useState(false);
 
-  const handleAddCategory = () => {
-    const newCat = prompt('請輸入新的食品類別名稱：');
-    if (newCat && newCat.trim() && !tempCategories.includes(newCat.trim())) {
-      setTempCategories([...tempCategories, newCat.trim()]);
+  const handleConfirmAddCategory = () => {
+    if (newCategoryName.trim() && !tempCategories.includes(newCategoryName.trim())) {
+      setTempCategories([...tempCategories, newCategoryName.trim()]);
+      setNewCategoryName('');
+      setIsAddingCategory(false);
     }
   };
 
@@ -24,10 +31,11 @@ export default function SettingsPage({ locations, categories, onSave, navigate }
     setTempCategories(tempCategories.filter(c => c !== cat));
   };
 
-  const handleAddLocation = () => {
-    const newLoc = prompt('請輸入新的存放位置名稱：');
-    if (newLoc && newLoc.trim() && !tempLocations.includes(newLoc.trim())) {
-      setTempLocations([...tempLocations, newLoc.trim()]);
+  const handleConfirmAddLocation = () => {
+    if (newLocationName.trim() && !tempLocations.includes(newLocationName.trim())) {
+      setTempLocations([...tempLocations, newLocationName.trim()]);
+      setNewLocationName('');
+      setIsAddingLocation(false);
     }
   };
 
@@ -79,13 +87,40 @@ export default function SettingsPage({ locations, categories, onSave, navigate }
               ))}
             </div>
             <div className="mt-6 border-t border-black/5 pt-4">
-              <button 
-                onClick={handleAddCategory}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#F9E076] py-3 text-sm font-bold text-[#4a4a4a] hover:opacity-90 transition-all"
-              >
-                <Plus size={20} />
-                新增食品類別
-              </button>
+              {isAddingCategory ? (
+                <div className="flex flex-col gap-2">
+                  <input 
+                    type="text"
+                    autoFocus
+                    placeholder="輸入類別名稱..."
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-none ring-1 ring-[#E8E2D2] focus:ring-2 focus:ring-[#A8D5BA]"
+                  />
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsAddingCategory(false)}
+                      className="flex-1 py-2 text-sm font-bold text-[#8a8060] bg-gray-100 rounded-lg"
+                    >
+                      取消
+                    </button>
+                    <button 
+                      onClick={handleConfirmAddCategory}
+                      className="flex-1 py-2 text-sm font-bold text-[#2c5c40] bg-[#A8D5BA] rounded-lg"
+                    >
+                      確認新增
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsAddingCategory(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#F9E076] py-3 text-sm font-bold text-[#4a4a4a] hover:opacity-90 transition-all"
+                >
+                  <Plus size={20} />
+                  新增食品類別
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -115,13 +150,40 @@ export default function SettingsPage({ locations, categories, onSave, navigate }
               ))}
             </div>
             <div className="mt-6 border-t border-black/5 pt-4">
-              <button 
-                onClick={handleAddLocation}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#F9E076] py-3 text-sm font-bold text-[#4a4a4a] hover:opacity-90 transition-all"
-              >
-                <Plus size={20} />
-                新增存放位置
-              </button>
+              {isAddingLocation ? (
+                <div className="flex flex-col gap-2">
+                  <input 
+                    type="text"
+                    autoFocus
+                    placeholder="輸入位置名稱..."
+                    value={newLocationName}
+                    onChange={(e) => setNewLocationName(e.target.value)}
+                    className="w-full px-4 py-3 rounded-xl border-none ring-1 ring-[#E8E2D2] focus:ring-2 focus:ring-[#A8D5BA]"
+                  />
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setIsAddingLocation(false)}
+                      className="flex-1 py-2 text-sm font-bold text-[#8a8060] bg-gray-100 rounded-lg"
+                    >
+                      取消
+                    </button>
+                    <button 
+                      onClick={handleConfirmAddLocation}
+                      className="flex-1 py-2 text-sm font-bold text-[#2c5c40] bg-[#A8D5BA] rounded-lg"
+                    >
+                      確認新增
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button 
+                  onClick={() => setIsAddingLocation(true)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#F9E076] py-3 text-sm font-bold text-[#4a4a4a] hover:opacity-90 transition-all"
+                >
+                  <Plus size={20} />
+                  新增存放位置
+                </button>
+              )}
             </div>
           </div>
         </section>

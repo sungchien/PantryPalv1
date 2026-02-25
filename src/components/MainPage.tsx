@@ -12,6 +12,7 @@ interface Props {
 export default function MainPage({ items, locations, navigate, onDelete }: Props) {
   const [search, setSearch] = useState('');
   const [selectedLocation, setSelectedLocation] = useState('全部');
+  const [itemToDelete, setItemToDelete] = useState<string | null>(null);
 
   const filteredItems = useMemo(() => {
     return items
@@ -20,9 +21,10 @@ export default function MainPage({ items, locations, navigate, onDelete }: Props
       .sort((a, b) => new Date(a.expiry_date).getTime() - new Date(b.expiry_date).getTime());
   }, [items, search, selectedLocation]);
 
-  const handleDelete = async (id: string) => {
-    if (confirm('確定要刪除這個食品嗎？')) {
-      await onDelete(id);
+  const handleDelete = async () => {
+    if (itemToDelete) {
+      await onDelete(itemToDelete);
+      setItemToDelete(null);
     }
   };
 
@@ -37,6 +39,32 @@ export default function MainPage({ items, locations, navigate, onDelete }: Props
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
+      {/* Custom Delete Confirmation Modal */}
+      {itemToDelete && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-xs shadow-2xl animate-in fade-in zoom-in duration-200">
+            <h3 className="text-xl font-bold text-[#4a4a4a] mb-2 text-center">確認刪除？</h3>
+            <p className="text-[#8a8060] text-center mb-6 leading-relaxed">
+              確定要將此食品從清單中刪除嗎？
+            </p>
+            <div className="flex flex-col gap-3">
+              <button 
+                onClick={handleDelete}
+                className="w-full py-4 bg-[#e57373] text-white font-bold rounded-2xl shadow-sm active:scale-95 transition-transform"
+              >
+                確定刪除
+              </button>
+              <button 
+                onClick={() => setItemToDelete(null)}
+                className="w-full py-4 bg-gray-100 text-[#8a8060] font-bold rounded-2xl active:scale-95 transition-transform"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="px-5 pt-12 pb-4 bg-[#FDF5E6] sticky top-0 z-10">
         <div className="flex items-center justify-center mb-4 relative">
           <h1 className="text-2xl font-bold tracking-tight text-[#4a4a4a]">PantryPal</h1>
@@ -112,7 +140,7 @@ export default function MainPage({ items, locations, navigate, onDelete }: Props
                   <Edit2 size={20} />
                 </button>
                 <button 
-                  onClick={() => handleDelete(item.id)}
+                  onClick={() => setItemToDelete(item.id)}
                   className="text-gray-400 hover:text-[#e57373] transition-colors p-2 rounded-full hover:bg-gray-50"
                 >
                   <Trash2 size={20} />
